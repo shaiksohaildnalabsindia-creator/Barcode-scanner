@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parcel Barcode Scanner</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    video {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Parcel Barcode Scanner</h2>
+
+  <video id="video" autoplay playsinline></video>
+
+  <p><b>Scanned:</b> <span id="result">None</span></p>
+  <p id="status"></p>
+
+  <button onclick="saveToSheet()">Save to Google Sheets</button>
+
+  <script type="module">
+    import { BrowserMultiFormatReader } from
+      "https://cdn.jsdelivr.net/npm/@zxing/browser@latest/+esm";
+
+    const reader = new BrowserMultiFormatReader();
+    const video = document.getElementById("video");
+    const resultEl = document.getElementById("result");
+    const statusEl = document.getElementById("status");
+
+    let lastScan = "";
+
+    // Start scanning
+    reader.decodeFromVideoDevice(null, video, (result, err) => {
+      if (result) {
+        const code = result.getText();
+
+        if (code === lastScan) return;
+
+        if (isValidTracking(code)) {
+          lastScan = code;
+          resultEl.textContent = code;
+          statusEl.textContent = "Valid tracking number ✅";
+          navigator.vibrate(200);
+        } else {
+          statusEl.textContent = "Invalid barcode ❌";
+        }
+      }
+    });
+
+    // Simple tracking number validation
+    function isValidTracking(code) {
+      return /^[A-Z0-9]{8,30}$/i.test(code);
+    }
+
+    // Save to Google Sheets
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyeQYwQuDai9LfwiGQSkjGLa9lB0F_lvuDBr0sEaAvw7s6TX3nrLoihV2ZT6J2cQmgq/exec";
+
+    window.saveToSheet = async function () {
+      if (!lastScan) {
+        alert("No barcode to save!");
+        return;
+      }
+
+      statusEl.textContent = "Saving...";
+
+      try {
+        await fetch(WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tracking: lastScan }),
+          mode: "no-cors"
+        });
+
+        statusEl.textContent = "Saved to Google Sheets ✅";
+        lastScan = ""; // prevent duplicate save
+
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Error connecting ❌";
+      }
+    };
+  </script>
+</body>
+</html>
